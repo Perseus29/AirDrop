@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P File Share</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      color: #667eea;
+      margin-bottom: 8px;
+      font-size: 28px;
+    }
+    
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #f0f4ff;
+      border-radius: 8px;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.disconnected {
+      background: #ef4444;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .device-name {
+      font-weight: 600;
+      color: #667eea;
+    }
+    
+    h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    
+    .peers-list {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .peer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s;
+    }
+    
+    .peer:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+    }
+    
+    .peer-name {
+      font-weight: 500;
+      color: #1e293b;
+    }
+    
+    .peer-status {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:hover:not(:disabled) {
+      background: #5568d3;
+      transform: scale(1.05);
+    }
+    
+    button:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    
+    .file-input-wrapper input[type=file] {
+      position: absolute;
+      left: -9999px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+    
+    .transfers {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .transfer {
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .transfer-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    
+    .transfer-name {
+      font-weight: 600;
+      color: #1e293b;
+      word-break: break-word;
+    }
+    
+    .transfer-size {
+      color: #64748b;
+      font-size: 14px;
+      white-space: nowrap;
+      margin-left: 12px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.3s;
+      border-radius: 4px;
+    }
+    
+    .transfer-status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    
+    .success {
+      color: #22c55e;
+      font-weight: 600;
+    }
+    
+    .error {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .error-message {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c33;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>🚀 P2P File Share</h1>
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+      
+      <div id="errorContainer"></div>
+      
+      <h2>Available Devices</h2>
+      <div class="peers-list" id="peersList">
+        <div class="empty-state">
+          <p>Waiting for other devices...</p>
+          <p style="margin-top: 8px; font-size: 14px;">Make sure other devices are connected to the same network</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card" id="transfersCard" style="display: none;">
+      <h2>Transfers</h2>
+      <div class="transfers" id="transfersList"></div>
+    </div>
+  </div>
+
+  <script>
+    const CHUNK_SIZE = 16384; // 16KB chunks
+    let ws = null;
+    let myId = null;
+    let myName = null;
+    let peers = new Map();
+    let connections = new Map(); // peerId -> RTCPeerConnection
+    let dataChannels = new Map(); // peerId -> RTCDataChannel
+    let activeTransfers = new Map();
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    
+    // Generate device name
+    const adjectives = ['Swift', 'Bright', 'Cool', 'Fast', 'Smart', 'Quick', 'Bold', 'Clever'];
+    const nouns = ['Eagle', 'Tiger', 'Falcon', 'Phoenix', 'Dragon', 'Wolf', 'Hawk', 'Lion'];
+    myName = `${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+    myId = Math.random().toString(36).substr(2, 9);
+    
+    // Update status UI
+    function updateStatus(connected, message) {
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      
+      if (connected) {
+        statusDot.classList.remove('disconnected');
+        statusText.innerHTML = `Connected as <span class="device-name">${myName}</span>`;
+      } else {
+        statusDot.classList.add('disconnected');
+        statusText.textContent = message || 'Disconnected';
+      }
+    }
+    
+    function showError(message) {
+      const errorContainer = document.getElementById('errorContainer');
+      errorContainer.innerHTML = `<div class="error-message">⚠️ ${message}</div>`;
+    }
+    
+    function clearError() {
+      document.getElementById('errorContainer').innerHTML = '';
+    }
+    
+    // Connect to signaling server
+    function connectSignaling() {
+      try {
+        // Get WebSocket URL - use localhost:8080 if opened as file://
+        let wsUrl;
+        if (window.location.protocol === 'file:') {
+          wsUrl = 'ws://localhost:8080';
+          showError('Please open this app through the server (http://localhost:8080) instead of opening the HTML file directly.');
+        } else {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsUrl = `${protocol}//${window.location.host}`;
+        }
+        
+        console.log('Connecting to signaling server:', wsUrl);
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          console.log('Connected to signaling server');
+          reconnectAttempts = 0;
+          clearError();
+          
+          ws.send(JSON.stringify({
+            type: 'register',
+            id: myId,
+            name: myName
+          }));
+          
+          updateStatus(true);
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            
+            switch (msg.type) {
+              case 'peers':
+                updatePeersList(msg.peers);
+                break;
+              case 'signal':
+                handleSignal(msg.from, msg.data);
+                break;
+            }
+          } catch (e) {
+            console.error('Error parsing message:', e);
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          showError('Connection error. Make sure the server is running.');
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket closed');
+          updateStatus(false, 'Disconnected - Reconnecting...');
+          
+          // Attempt to reconnect
+          reconnectAttempts++;
+          if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+            setTimeout(connectSignaling, 2000 * reconnectAttempts);
+          } else {
+            updateStatus(false, 'Connection failed');
+            showError('Could not connect to server. Please refresh the page.');
+          }
+        };
+      } catch (e) {
+        console.error('Error creating WebSocket:', e);
+        showError('Failed to connect: ' + e.message);
+      }
+    }
+    
+    function updatePeersList(peersList) {
+      const container = document.getElementById('peersList');
+      
+      // Filter out self
+      const otherPeers = peersList.filter(p => p.id !== myId);
+      
+      if (otherPeers.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>No other devices found</p>
+            <p style="margin-top: 8px; font-size: 14px;">Make sure other devices open this page on the same network</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = '';
+      
+      otherPeers.forEach(peer => {
+        peers.set(peer.id, peer);
+        
+        const peerEl = document.createElement('div');
+        peerEl.className = 'peer';
+        peerEl.innerHTML = `
+          <div>
+            <div class="peer-name">${escapeHtml(peer.name)}</div>
+            <div class="peer-status" id="status-${peer.id}">Ready</div>
+          </div>
+          <div class="file-input-wrapper">
+            <button onclick="document.getElementById('file-${peer.id}').click()">Send File</button>
+            <input type="file" id="file-${peer.id}">
+          </div>
+        `;
+        
+        // Add file selection handler
+        const fileInput = peerEl.querySelector(`#file-${peer.id}`);
+        fileInput.addEventListener('change', () => selectFile(peer.id));
+        
+        container.appendChild(peerEl);
+      });
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    async function createConnection(peerId, isInitiator) {
+      try {
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        });
+        
+        connections.set(peerId, pc);
+        
+        pc.onicecandidate = (event) => {
+          if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+            sendSignal(peerId, {
+              type: 'candidate',
+              candidate: event.candidate
+            });
+          }
+        };
+        
+        pc.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+            updatePeerStatus(peerId, 'Connection lost');
+          }
+        };
+        
+        if (isInitiator) {
+          const dc = pc.createDataChannel('fileTransfer', {
+            ordered: true
+          });
+          setupDataChannel(peerId, dc);
+        } else {
+          pc.ondatachannel = (event) => {
+            setupDataChannel(peerId, event.channel);
+          };
+        }
+        
+        return pc;
+      } catch (e) {
+        console.error('Error creating peer connection:', e);
+        showError('Failed to create connection: ' + e.message);
+        return null;
+      }
+    }
+    
+    function setupDataChannel(peerId, dc) {
+      dataChannels.set(peerId, dc);
+      
+      dc.binaryType = 'arraybuffer';
+      
+      dc.onopen = () => {
+        console.log(`Data channel opened with ${peerId}`);
+        updatePeerStatus(peerId, 'Connected ✓');
+      };
+      
+      dc.onclose = () => {
+        console.log(`Data channel closed with ${peerId}`);
+        updatePeerStatus(peerId, 'Disconnected');
+      };
+      
+      dc.onerror = (error) => {
+        console.error('Data channel error:', error);
+        updatePeerStatus(peerId, 'Error');
+      };
+      
+      dc.onmessage = (event) => {
+        handleIncomingData(peerId, event.data);
+      };
+    }
+    
+    function sendSignal(target, data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'signal',
+          target: target,
+          data: data
+        }));
+      }
+    }
+    
+    async function handleSignal(from, data) {
+      try {
+        let pc = connections.get(from);
+        
+        if (data.type === 'offer') {
+          if (!pc) {
+            pc = await createConnection(from, false);
+          }
+          if (!pc) return;
+          
+          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          sendSignal(from, { type: 'answer', answer });
+        } else if (data.type === 'answer') {
+          if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          }
+        } else if (data.type === 'candidate') {
+          if (pc) {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          }
+        }
+      } catch (e) {
+        console.error('Error handling signal:', e);
+      }
+    }
+    
+    async function selectFile(peerId) {
+      const fileInput = document.getElementById(`file-${peerId}`);
+      const file = fileInput.files[0];
+      
+      if (!file) return;
+      
+      console.log('File selected:', file.name, file.size);
+      
+      // Reset input
+      fileInput.value = '';
+      
+      try {
+        // Create connection if doesn't exist
+        let dc = dataChannels.get(peerId);
+        if (!dc || dc.readyState !== 'open') {
+          updatePeerStatus(peerId, 'Connecting...');
+          
+          const pc = await createConnection(peerId, true);
+          if (!pc) {
+            updatePeerStatus(peerId, 'Connection failed');
+            return;
+          }
+          
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal(peerId, { type: 'offer', offer });
+          
+          // Wait for connection with timeout
+          const timeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout')), 10000)
+          );
+          
+          const connectionReady = new Promise((resolve) => {
+            const checkInterval = setInterval(() => {
+              dc = dataChannels.get(peerId);
+              if (dc && dc.readyState === 'open') {
+                clearInterval(checkInterval);
+                resolve();
+              }
+            }, 100);
+          });
+          
+          await Promise.race([connectionReady, timeout]);
+        }
+        
+        sendFile(peerId, file);
+      } catch (e) {
+        console.error('Error sending file:', e);
+        updatePeerStatus(peerId, 'Failed');
+        alert('Failed to send file: ' + e.message);
+      }
+    }
+    
+    function sendFile(peerId, file) {
+      const transferId = Math.random().toString(36).substr(2, 9);
+      const dc = dataChannels.get(peerId);
+      
+      if (!dc || dc.readyState !== 'open') {
+        alert('Connection not ready. Please try again.');
+        return;
+      }
+      
+      try {
+        // Send metadata
+        dc.send(JSON.stringify({
+          type: 'metadata',
+          transferId,
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'application/octet-stream'
+        }));
+        
+        // Create transfer UI
+        createTransferUI(transferId, file.name, file.size, 'sending');
+        
+        // Send file in chunks
+        const reader = new FileReader();
+        let offset = 0;
+        
+        reader.onload = (e) => {
+          if (dc.readyState === 'open') {
+            dc.send(e.target.result);
+            offset += e.target.result.byteLength;
+            
+            updateTransferProgress(transferId, offset, file.size);
+            
+            if (offset < file.size) {
+              readNextChunk();
+            } else {
+              dc.send(JSON.stringify({ type: 'done', transferId }));
+              completeTransfer(transferId, true);
+            }
+          } else {
+            completeTransfer(transferId, false);
+          }
+        };
+        
+        reader.onerror = () => {
+          console.error('Error reading file');
+          completeTransfer(transferId, false);
+        };
+        
+        function readNextChunk() {
+          const slice = file.slice(offset, offset + CHUNK_SIZE);
+          reader.readAsArrayBuffer(slice);
+        }
+        
+        readNextChunk();
+      } catch (e) {
+        console.error('Error in sendFile:', e);
+        completeTransfer(transferId, false);
+      }
+    }
+    
+    function handleIncomingData(peerId, data) {
+      try {
+        // Check if it's a control message (string) or file data (ArrayBuffer)
+        if (typeof data === 'string') {
+          const msg = JSON.parse(data);
+          
+          if (msg.type === 'metadata') {
+            activeTransfers.set(msg.transferId, {
+              name: msg.name,
+              size: msg.size,
+              mimeType: msg.mimeType,
+              received: 0,
+              chunks: []
+            });
+            createTransferUI(msg.transferId, msg.name, msg.size, 'receiving');
+          } else if (msg.type === 'done') {
+            const transfer = activeTransfers.get(msg.transferId);
+            if (transfer) {
+              const blob = new Blob(transfer.chunks, { type: transfer.mimeType });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = transfer.name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 100);
+              
+              completeTransfer(msg.transferId, true);
+              activeTransfers.delete(msg.transferId);
+            }
+          }
+        } else if (data instanceof ArrayBuffer) {
+          // Find the active transfer that's still receiving
+          let foundTransfer = null;
+          let foundId = null;
+          
+          for (const [id, transfer] of activeTransfers.entries()) {
+            if (transfer.received < transfer.size) {
+              foundTransfer = transfer;
+              foundId = id;
+              break;
+            }
+          }
+          
+          if (foundTransfer) {
+            foundTransfer.chunks.push(data);
+            foundTransfer.received += data.byteLength;
+            updateTransferProgress(foundId, foundTransfer.received, foundTransfer.size);
+          }
+        }
+      } catch (e) {
+        console.error('Error handling incoming data:', e);
+      }
+    }
+    
+    function createTransferUI(transferId, fileName, fileSize, direction) {
+      const card = document.getElementById('transfersCard');
+      const list = document.getElementById('transfersList');
+      
+      card.style.display = 'block';
+      
+      const transferEl = document.createElement('div');
+      transferEl.className = 'transfer';
+      transferEl.id = `transfer-${transferId}`;
+      
+      const sizeStr = formatBytes(fileSize);
+      const directionStr = direction === 'sending' ? '📤 Sending' : '📥 Receiving';
+      
+      transferEl.innerHTML = `
+        <div class="transfer-header">
+          <div class="transfer-name">${escapeHtml(fileName)}</div>
+          <div class="transfer-size">${sizeStr}</div>
+        </div>
+        <div class="transfer-status">${directionStr}...</div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 0%"></div>
+        </div>
+      `;
+      
+      list.insertBefore(transferEl, list.firstChild);
+    }
+    
+    function updateTransferProgress(transferId, current, total) {
+      const el = document.getElementById(`transfer-${transferId}`);
+      if (!el) return;
+      
+      const percent = Math.min(100, (current / total * 100)).toFixed(1);
+      const fill = el.querySelector('.progress-fill');
+      const status = el.querySelector('.transfer-status');
+      
+      fill.style.width = `${percent}%`;
+      status.textContent = `${percent}% (${formatBytes(current)} / ${formatBytes(total)})`;
+    }
+    
+    function completeTransfer(transferId, success) {
+      const el = document.getElementById(`transfer-${transferId}`);
+      if (!el) return;
+      
+      const fill = el.querySelector('.progress-fill');
+      const status = el.querySelector('.transfer-status');
+      
+      if (success) {
+        fill.style.width = '100%';
+        status.textContent = 'Complete ✓';
+        status.className = 'transfer-status success';
+      } else {
+        status.textContent = 'Failed ✗';
+        status.className = 'transfer-status error';
+      }
+    }
+    
+    function updatePeerStatus(peerId, status) {
+      const statusEl = document.getElementById(`status-${peerId}`);
+      if (statusEl) {
+        statusEl.textContent = status;
+      }
+    }
+    
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Initialize
+    console.log('Initializing P2P File Share...');
+    console.log('Device:', myName, '(' + myId + ')');
+    connectSignaling();
+  </script>
+</body>
+</html>
