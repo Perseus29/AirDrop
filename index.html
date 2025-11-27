@@ -291,7 +291,7 @@
         // Get WebSocket URL - use localhost:8080 if opened as file://
         let wsUrl;
         if (window.location.protocol === 'file:') {
-          wsUrl = 'ws://localhost:8080';
+          wsUrl = 'https://airdrop-v9jf.onrender.com/';
           showError('Please open this app through the server (http://localhost:8080) instead of opening the HTML file directly.');
         } else {
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
